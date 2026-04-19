@@ -1,0 +1,20 @@
+﻿# ──────────────────────────────────────────────────────────────────────────────
+# LLM Configuration
+# Secrets (API keys, endpoints) must be set in .env — never here.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Provider to use.  One of: openai | azure | anthropic
+# Can be overridden by the LLM_PROVIDER environment variable.
+LLM_PROVIDER: openai
+
+# Model name / deployment name
+LLM_MODEL: gpt-4o
+
+# Sampling temperature (0.0 = deterministic, 1.0 = creative)
+LLM_TEMPERATURE: 0.2
+
+# Maximum tokens in the LLM response
+LLM_MAX_TOKENS: 4096
+
+# Azure-only: API version (ignored for openai / anthropic)
+LLM_AZURE_API_VERSION: "2024-02-01"
