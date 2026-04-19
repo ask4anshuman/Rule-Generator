@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,7 +7,6 @@ import pytest
 from src.core.prompt_builder import build_messages
 from src.core.rule_generator import generate_rule, save_rule
 from src.core.validator import check_missing_mandatory, detect_parameters_from_sql, validate_rule_input
-from src.loaders.prototype_loader import Prototype, load_prototypes
 from src.models.rule_config import ColumnMapping, ContainerConfig, Parameter, RuleInput
 
 
@@ -60,42 +57,6 @@ def replace_rule() -> RuleInput:
             )
         ],
     )
-
-
-# ── prototype_loader tests ────────────────────────────────────────────────────
-
-class TestPrototypeLoader:
-    def test_load_from_empty_dir_returns_empty(self, tmp_path: Path) -> None:
-        result = load_prototypes(tmp_path)
-        assert result == []
-
-    def test_load_from_nonexistent_dir_returns_empty(self) -> None:
-        result = load_prototypes(Path("/nonexistent/path/xyz"))
-        assert result == []
-
-    def test_loads_sql_files(self, tmp_path: Path) -> None:
-        (tmp_path / "rule1.sql").write_text("SELECT 1;", encoding="utf-8")
-        (tmp_path / "rule2.sql").write_text("SELECT 2;", encoding="utf-8")
-        (tmp_path / "readme.txt").write_text("ignore me", encoding="utf-8")
-
-        result = load_prototypes(tmp_path)
-        assert len(result) == 2
-        filenames = {p.filename for p in result}
-        assert filenames == {"rule1.sql", "rule2.sql"}
-
-    def test_ignores_empty_sql_files(self, tmp_path: Path) -> None:
-        (tmp_path / "empty.sql").write_text("   \n  ", encoding="utf-8")
-        result = load_prototypes(tmp_path)
-        assert result == []
-
-    def test_loads_nested_sql_files(self, tmp_path: Path) -> None:
-        sub = tmp_path / "subdir"
-        sub.mkdir()
-        (sub / "nested.sql").write_text("SELECT 3;", encoding="utf-8")
-        result = load_prototypes(tmp_path)
-        assert len(result) == 1
-        assert result[0].filename == "nested.sql"
-
 
 # ── validator tests ───────────────────────────────────────────────────────────
 

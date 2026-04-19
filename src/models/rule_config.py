@@ -136,27 +136,3 @@ class RuleInput(BaseModel):
     @classmethod
     def strip_whitespace(cls, v: str) -> str:
         return v.strip()
-
-class ContainerConfig(BaseModel):
-    container_name: str        # Short ID used in key path: [ORDERS], [CUSTOMERS], etc.
-    target_table: str          # The actual table name that [CONTAINER] resolves to
-    action: str
-    source_sql: str
-    scope_sql: Optional[str] = None
-    column_mappings: list[ColumnMapping] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def scope_required_for_replace(self) -> "ContainerConfig":
-        if self.action.upper() == "REPLACE" and not (self.scope_sql or "").strip():
-            raise ValueError("scope_sql is required when action is REPLACE.")
-        return self
-
-class RuleInput(BaseModel):
-    rule_name: str
-    process: str
-    operation: str
-    created_by: str
-    comments: str
-    parameters: list[Parameter] = Field(default_factory=list)   # shared/global
-    containers: list[ContainerConfig] = Field(default_factory=list)  # ordered
-    extra_params: Optional[dict[str, str]] = None

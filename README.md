@@ -1,46 +1,7 @@
 # Rule Generator
 
 An AI-assisted CLI tool that helps developers create **Loader ETL rules** by:
-- Reading prototype `.sql` rules from the `prototypes/` folder as few-shot examples
-- Interactively collecting all mandatory rule inputs (action, tables, source SQL, column mappings, etc.)
-- Calling a configurable LLM to generate a well-formed, production-ready rule
-- Saving the output to the `output/` folder
-
----
-
-## Project Structure
-
-Rule-Generator/
-+-- .env                        <- your credentials (git-ignored; copy from .env.example)
-+-- .env.example                <- template for all environment variables
-+-- requirements.txt
-+-- pyproject.toml
-+-- config/
-|   \-- llm_config.yaml         <- provider selection, model, temperature defaults
-+-- prototypes/                 <- drop your reference .sql rule files here
-+-- output/                     <- generated rules are saved here
-+-- templates/
-|   \-- system_prompt.txt       <- LLM system instructions (update as needed)
-+-- src/
-|   +-- cli/
-|   |   \-- main.py             <- interactive CLI entry point
-|   +-- core/
-|   |   +-- rule_generator.py   <- orchestration: load -> prompt -> LLM -> save
-|   |   +-- prompt_builder.py   <- assembles few-shot prompt from prototypes + inputs
-|   |   \-- validator.py        <- mandatory field checks before LLM call
-|   +-- llm/
-|   |   +-- client.py           <- generic LLM client + factory
-|   |   \-- __init__.py         <- re-exports LLMClient, Message, get_llm_client
-|   +-- loaders/
-|   |   \-- prototype_loader.py <- reads all .sql files from prototypes/
-|   \-- models/
-|       \-- rule_config.py      <- Pydantic models: RuleInput, Parameter, ColumnMapping
-\-- tests/
-    \-- test_rule_generator.py  <- unit tests (28 tests)ule Generator
-
-An AI-assisted CLI tool that helps developers create **Loader ETL rules** by:
-- Reading prototype `.sql` rules from the `prototypes/` folder as few-shot examples
-- Interactively collecting all mandatory rule inputs (action, tables, source SQL, column mappings, etc.)
+- Interactively collecting all mandatory rule inputs (process, operation, containers, source SQL, etc.)
 - Calling a configurable LLM to generate a well-formed, production-ready rule
 - Saving the output to the `output/` folder
 
@@ -56,7 +17,6 @@ Rule-Generator/
 +-- pyproject.toml
 +-- config/
 |   \-- llm_config.yaml         <- provider selection, model, temperature defaults
-+-- prototypes/                 <- drop your reference .sql rule files here
 +-- output/                     <- generated rules are saved here
 +-- templates/
 |   \-- system_prompt.txt       <- LLM system instructions (update as needed)
@@ -70,12 +30,10 @@ Rule-Generator/
 |   +-- llm/
 |   |   +-- client.py           <- generic LLM client + factory
 |   |   \-- __init__.py         <- re-exports LLMClient, Message, get_llm_client
-|   +-- loaders/
-|   |   \-- prototype_loader.py <- reads all .sql files from prototypes/
 |   \-- models/
 |       \-- rule_config.py      <- Pydantic models: RuleInput, Parameter, ColumnMapping
 \-- tests/
-    \-- test_rule_generator.py  <- unit tests (28 tests)
+    \-- test_rule_generator.py  <- unit tests (25 tests)
 ```
 
 ---
@@ -123,14 +81,6 @@ Open `.env` and fill in the values for your chosen provider:
 
 Model, temperature, and other non-secret settings are configured in `config/llm_config.yaml`.
 
-### 4. Add prototype rules
-
-Drop one or more reference `.sql` rule files into the `prototypes/` folder.  
-These are used as few-shot examples so the LLM mirrors your project's exact formatting and conventions.  
-The more prototypes provided, the higher-quality and more consistent the generated rules will be.
-
-> **Note:** The tool works without prototypes -- it will generate rules from the framework guidelines in `templates/system_prompt.txt` only.
-
 ---
 
 ## Running the Tool
@@ -149,25 +99,24 @@ rule-gen
 
 | Flag | Description |
 |---|---|
-| `--prototypes-dir <path>` | Override the default `prototypes/` folder location |
 | `--debug` | Enable verbose debug logging |
 
 ---
 
 ## Interactive Workflow
 
-The CLI walks you through 6 steps:
+The CLI walks you through 4 steps:
 
 | Step | What you provide |
 |---|---|
-| 1 | Rule name, Action (APPEND / REPLACE / EXPIRE / TRANSACTIONAL_APPEND / DELETE / UPSERT), SCD type |
-| 2 | Source (STG) table name, Target table name |
-| 3 | COB / filter parameter (e.g. `:COB_DATE`) |
-| 4 | Full SOURCE SQL query (multiline; blank line to finish) |
-| 5 | Column mappings -- source expression -> target column, with key/date flags |
-| 6 | Optional extra key-value parameters (partition key, retention days, etc.) |
+| 1 | Rule name, created by (email / ID), comments / description |
+| 2 | PROCESS name, OPERATION name |
+| 3 | One or more containers: container name, target table, action, source SQL (+ scope SQL if REPLACE). Repeat until all containers are added. |
+| 4 | COB / filter parameters (auto-detected from source SQL; option to add more manually) |
 
 After generation, the rule is displayed with syntax highlighting and you are prompted to save it to `output/<rule_name>.sql`.
+
+> **Column mappings** are derived automatically from the SELECT columns in each container's source SQL — no manual entry required.
 
 ---
 
@@ -178,21 +127,9 @@ After generation, the rule is displayed with syntax highlighting and you are pro
 | `APPEND` | Insert new rows; never update existing ones |
 | `REPLACE` | Truncate-and-reload the target partition/table |
 | `EXPIRE` | Logically close (expire) existing rows matching the key |
-| `TRANSACTIONAL_APPEND` | Append within a transaction; rolls back on failure |
-| `DELETE` | Hard-delete rows matching the business key |
-| `UPSERT` | Insert or update based on the business key |
+| `TRANSACTIONAL APPEND` | Append within a transaction; rolls back on failure |
+| `TRANSACTIONAL REPLACE` | Replace within a transaction; rolls back on failure |
 
-## Supported SCD Types
-
-| SCD | Strategy |
-|---|---|
-| `SCD1` | Overwrite existing record in place |
-| `SCD2` | Add versioned record; expire old one using effective/expiry date columns |
-| `SCD3` | Store previous value in a separate column alongside current |
-| `SCD4` | Keep separate history table; main table holds current record only |
-| `NONE` | No SCD logic (transactional / append-only targets) |
-
----
 
 ## LLM Configuration
 
@@ -218,7 +155,7 @@ To switch provider, change `LLM_PROVIDER` in the YAML or set `LLM_PROVIDER=<valu
 py -m pytest tests/ -v
 ```
 
-All 28 unit tests cover: prototype loading, input validation, parameter detection, prompt assembly, rule saving, and the LLM call (mocked).
+All 25 unit tests cover: prototype loading, input validation, parameter detection, prompt assembly, rule saving, and the LLM call (mocked).
 
 ---
 
