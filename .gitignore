@@ -15,7 +15,7 @@ env/
 .env
 
 # Generated output (keep the folder, ignore generated files)
-output/*.sql
+#output/*.sql
 
 # IDE
 .vscode/
